@@ -16,8 +16,8 @@ RGBLIGHT_ENABLE = yes       # Enable keyboard RGB underglow
 ENCODER_ENABLE = yes        # Enable rotary encoder support
 AUDIO_ENABLE = no           # Audio output
 
-SPLIT_KEYBOARD = yes
-SERIAL_DRIVER = usart
+#SPLIT_KEYBOARD = yes
+#SERIAL_DRIVER = usart
 WS2812_DRIVER = pwm
 
 DEFAULT_FOLDER = zvecr/zv48/f401
