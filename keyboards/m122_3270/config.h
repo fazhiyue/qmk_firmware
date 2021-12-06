@@ -44,5 +44,25 @@
 /* COL2ROW, ROW2COL*/
 #define DIODE_DIRECTION ROW2COL
 
+/* OLED */
+#ifdef OLED_DRIVER_ENABLE
+#    define OLED_DISPLAY_CUSTOM
+#    define OLED_DISPLAY_WIDTH 128
+#    define OLED_DISPLAY_HEIGHT 32
+
+#    define I2C_DRIVER I2CD1
+//#    define OLED_IC OLED_IC_SH1106  // 选用1.3寸SH1106主控OLED时打开, 0.96寸SSD1306主控OLED注释掉本行。
+//#    define OLED_COLUMN_OFFSET 2  // 调整OLED纵向偏移，0.96寸SSD1306主控OLED注释掉本行。
+#    define I2C1_TIMINGR_PRESC 0U
+#    define I2C1_TIMINGR_SCLDEL 7U
+#    define I2C1_TIMINGR_SDADEL 0U
+#    define I2C1_TIMINGR_SCLH 38U
+#    define I2C1_TIMINGR_SCLL 129U
+#    define OLED_TIMEOUT 60000  // 60秒无操作关闭OLED
+#    define OLED_FONT_HEIGHT 8
+#    define OLED_FONT_WIDTH 6
+#    define OLED_FONT_H "neil_font.c"
+#endif
+
 /* Debounce reduces chatter (unintended double-presses) - set 0 if debouncing is not needed */
 #define DEBOUNCE 10
