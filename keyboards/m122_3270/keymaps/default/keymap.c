@@ -18,10 +18,13 @@
 #include "quantum.h"
 #include "oledfont.h"
 #include "anime.h"
-//#include "bmp.h"
+#include "bmp.h"
+
+static uint32_t oled_timer = 0;		  // OLED 计时器
+#define OLED_SHOW_STATE_TIMEOUT 20000 // 无操作10秒后激活OLED动画
 
 #define ANIM_NUM_FRAMES 40	   // 动画总帧数
-#define ANIM_FRAME_DURATION 60 // 帧时间
+#define ANIM_FRAME_DURATION 20 // 帧时间
 #define ANIM_TOTAL_FRAMES 79
 
 #define OLED_SCL_Clr() writePinLow(B13) //SCL
@@ -359,6 +362,12 @@ void OLED_ShowString(unsigned char x, unsigned char y, unsigned char *chr, unsig
 {
 	while ((*chr >= ' ') && (*chr <= '~')) //判断是不是非法字符!
 	{
+		if(x>=128)
+		{
+			x = 0;
+			chr++;
+			continue;
+		}
 		OLED_ShowChar(x, y, *chr, size1, mode);
 		if (size1 == 8)
 			x += 6;
@@ -579,17 +588,97 @@ void keyboard_pre_init_user(void)
 	OLED_Clear();
 }
 
+#define KEYLOGGER_LENGTH 7
+static char keylog_str[KEYLOGGER_LENGTH + 1] = {0};
+
+static const char PROGMEM code_to_name[0xFF] = {
+	//   0    1    2    3    4    5    6    7    8    9    A    B    c    D    E    F
+	182, ' ', ' ', ' ', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',	  // 0x
+	'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '1', '2',	  // 1x
+	'3', '4', '5', '6', '7', '8', '9', '0', 20, 19, 17, 29, 22, '-', '=', '[',		  // 2x
+	']', '\\', '#', ';', '\'', '`', ',', '.', '/', 188, 149, 150, 151, 152, 153, 154, // 3x
+	155, 156, 157, 158, 159, 181, 191, 190, ' ', ' ', 185, 183, 16, 186, 184, 26,	  // 4x
+	27, 25, 24, 189, '/', '*', '-', '+', ' ', '1', '2', '3', '4', '5', '6', '7',	  // 5x
+	'8', '9', '0', '.', ' ', 187, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // 6x
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // 7x
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // 8x
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // 9x
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 214, 215, 216, 217, 218, 219, 220, 221,	  // Ax
+	' ', ' ', 213, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // Bx
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // Cx
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // Dx
+	'C', 'S', 'A', 'W', ' ', 'S', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',	  // Ex
+	' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '		  // Fx
+};
+
+void add_keylog(uint16_t keycode)
+{
+	if ((keycode >= QK_MOD_TAP && keycode <= QK_MOD_TAP_MAX) || (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX) || (keycode >= QK_MODS && keycode <= QK_MODS_MAX))
+	{
+		keycode = keycode & 0xFF;
+	}
+	else if (keycode > 0xFF)
+	{
+		keycode = 0;
+	}
+
+	for (uint8_t i = (KEYLOGGER_LENGTH - 1); i > 0; --i)
+	{
+		keylog_str[i] = keylog_str[i - 1];
+	}
+
+	if (keycode < (sizeof(code_to_name) / sizeof(char)))
+	{
+		keylog_str[0] = pgm_read_byte(&code_to_name[keycode]);
+	}
+}
 uint16_t anim_timer = 0;
+int banner = 0;
+int banner_total = 148;
+int banner_reverse = 74;
+
+void render_keylogger_status(void)
+{
+	OLED_ShowPicture(0, 0, 128, 32, BMP2, 0);
+	OLED_ShowString(0, 0, (unsigned char *)&keylog_str, 24, 0);
+	OLED_ShowString(abs((banner_reverse - 1) - banner), 24, (unsigned char *)"Love Rui!", 8, 0);
+	if (timer_elapsed(anim_timer) > ANIM_FRAME_DURATION)
+	{
+		anim_timer = timer_read();
+		banner = (banner + 1) % banner_total;
+	}
+	OLED_Refresh();
+}
+
+
 uint8_t current_anim_frame = 0;
 
 void housekeeping_task_user(void)
 {
-	if (timer_elapsed(anim_timer) > ANIM_FRAME_DURATION)
+	if (timer_elapsed32(oled_timer) > OLED_SHOW_STATE_TIMEOUT)
 	{
-		anim_timer = timer_read();
-		current_anim_frame = (current_anim_frame + 1) % ANIM_TOTAL_FRAMES;
-		OLED_ShowPicture(0, 0, 128, 32, frame[abs((ANIM_NUM_FRAMES - 1) - current_anim_frame)], 1);
-		OLED_Refresh();
+		if (timer_elapsed(anim_timer) > ANIM_FRAME_DURATION)
+		{
+			anim_timer = timer_read();
+			current_anim_frame = (current_anim_frame + 1) % ANIM_TOTAL_FRAMES;
+			OLED_ShowPicture(0, 0, 128, 32, frame[abs((ANIM_NUM_FRAMES - 1) - current_anim_frame)], 1);
+			OLED_Refresh();
+			wait_ms(1);
+			return;
+		}
 	}
+	else
+		render_keylogger_status();
 	wait_ms(1);
+}
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record)
+{
+	// If console is enabled, it will print the matrix position and status of each key pressed
+	if (record->event.pressed)
+	{
+		add_keylog(keycode);
+		oled_timer = timer_read32();
+	}
+	return true;
 }
