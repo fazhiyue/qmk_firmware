@@ -16,8 +16,13 @@
 #include QMK_KEYBOARD_H
 #include "print.h"
 #include "quantum.h"
-#include "oled.h"
 #include "oledfont.h"
+#include "anime.h"
+//#include "bmp.h"
+
+#define ANIM_NUM_FRAMES 40	   // 动画总帧数
+#define ANIM_FRAME_DURATION 60 // 帧时间
+#define ANIM_TOTAL_FRAMES 79
 
 #define OLED_SCL_Clr() writePinLow(B13) //SCL
 #define OLED_SCL_Set() writePinHigh(B13)
@@ -31,8 +36,31 @@
 #define OLED_DC_Clr() writePinLow(A8) //DC
 #define OLED_DC_Set() writePinHigh(A8)
 
-#define OLED_CS_Clr() writePinLow(C15) //CS
-#define OLED_CS_Set() writePinHigh(C15)
+//#define OLED_CS_Clr() writePinLow(C15) //CS
+//#define OLED_CS_Set() writePinHigh(C15)
+
+#define OLED_CMD 0	//写命令
+#define OLED_DATA 1 //写数据
+
+void OLED_ClearPoint(unsigned char x, unsigned char y);
+void OLED_ColorTurn(unsigned char i);
+void OLED_DisplayTurn(unsigned char i);
+void OLED_WR_Byte(unsigned char dat, unsigned char mode);
+void OLED_DisPlay_On(void);
+void OLED_DisPlay_Off(void);
+void OLED_Refresh(void);
+void OLED_Clear(void);
+void OLED_DrawPoint(unsigned char x, unsigned char y, unsigned char t);
+void OLED_DrawLine(unsigned char x1, unsigned char y1, unsigned char x2, unsigned char y2, unsigned char mode);
+void OLED_DrawCircle(unsigned char x, unsigned char y, unsigned char r);
+void OLED_ShowChar(unsigned char x, unsigned char y, unsigned char chr, unsigned char size1, unsigned char mode);
+void OLED_ShowChar6x8(unsigned char x, unsigned char y, unsigned char chr, unsigned char mode);
+void OLED_ShowString(unsigned char x, unsigned char y, unsigned char *chr, unsigned char size1, unsigned char mode);
+void OLED_ShowNum(unsigned char x, unsigned char y, unsigned int num, unsigned char len, unsigned char size1, unsigned char mode);
+void OLED_ShowChinese(unsigned char x, unsigned char y, unsigned char num, unsigned char size1, unsigned char mode);
+void OLED_ScrollDisplay(unsigned char num, unsigned char space, unsigned char mode);
+void OLED_ShowPicture(unsigned char x, unsigned char y, unsigned char sizex, unsigned char sizey, unsigned char BMP[], unsigned char mode);
+void OLED_Init(void);
 
 enum custom_keycodes
 {
@@ -61,11 +89,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 		KC_GRV, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9, KC_0, KC_MINS, KC_EQL, KC_BSPC, KC_P7, KC_P8, KC_P9,
 		KC_TAB, KC_Q, KC_W, KC_E, KC_R, KC_T, KC_Y, KC_U, KC_I, KC_O, KC_P, KC_LBRC, KC_RBRC, KC_BSLS, KC_P4, KC_P5, KC_P6,
 		KC_CAPS, KC_A, KC_S, KC_D, KC_F, KC_G, KC_H, KC_J, KC_K, KC_L, KC_SCLN, KC_QUOT, KC_ENT, KC_P1, KC_P2, KC_P3,
-		KC_LSFT, KC_Z, KC_X, KC_C, KC_V, KC_B, KC_N, KC_M, KC_COMM, KC_DOT, KC_SLSH, KC_LSFT, KC_UP, KC_P0,
+		KC_LSFT, KC_Z, KC_X, KC_C, KC_V, KC_B, KC_N, KC_M, KC_COMM, KC_DOT, KC_SLSH, KC_RSFT, KC_UP, KC_P0,
 		KC_LCTL, MO(1), KC_LGUI, KC_LALT, KC_SPC, KC_RALT, KC_APP, KC_RCTL, KC_LEFT, KC_DOWN, KC_RGHT, KC_PDOT),
 	[_FN] = LAYOUT(
 		RESET, RGB_HUI, RGB_SAI, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_INS, KC_LSCR, KC_NO,
-		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, RGB_VAD, RGB_VAI, KC_TRNS, KC_TRNS, KC_TRNS, KC_HOME, KC_MS_U, KC_PGUP,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, RGB_VAD, RGB_VAI, RGB_SPD, RGB_SPI, KC_TRNS, KC_HOME, KC_MS_U, KC_PGUP,
 		KC_TAB, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_MS_L, KC_BTN1, KC_MS_R,
 		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, RGB_MOD, KC_END, KC_MS_D, KC_PGDN,
 		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_PGUP, KC_0,
@@ -109,7 +137,7 @@ void OLED_WR_Byte(unsigned char dat, unsigned char cmd)
 		OLED_DC_Set();
 	else
 		OLED_DC_Clr();
-	OLED_CS_Clr();
+	//OLED_CS_Clr();
 	for (i = 0; i < 8; i++)
 	{
 		OLED_SCL_Clr();
@@ -120,7 +148,7 @@ void OLED_WR_Byte(unsigned char dat, unsigned char cmd)
 		OLED_SCL_Set();
 		dat <<= 1;
 	}
-	OLED_CS_Set();
+	//OLED_CS_Set();
 	OLED_DC_Set();
 }
 
@@ -514,18 +542,17 @@ void OLED_Init(void)
 	setPinOutput(A8);
 
 	OLED_RES_Clr();
-	wait_ms(1000);
+	wait_ms(200);
 	OLED_RES_Set();
+	wait_ms(200);
 
-	OLED_WR_Byte(0xAE, OLED_CMD); //--turn off oled panel
-	OLED_WR_Byte(0x00, OLED_CMD); //---set low column address
-	OLED_WR_Byte(0x10, OLED_CMD); //---set high column address
-	OLED_WR_Byte(0x00, OLED_CMD); //--set start line address  Set Mapping RAM Display Start Line (0x00~0x3F)
-	OLED_WR_Byte(0x81, OLED_CMD); //--set contrast control register
-	OLED_WR_Byte(0xB0, OLED_CMD); //set page address
-	OLED_WR_Byte(0x81, OLED_CMD);			  /*contract control*/
-	OLED_WR_Byte(0x8F, OLED_CMD);			  /*128*/
-
+	OLED_WR_Byte(0xAE, OLED_CMD); /*display off*/
+	OLED_WR_Byte(0x00, OLED_CMD); /*set lower column address*/
+	OLED_WR_Byte(0x10, OLED_CMD); /*set higher column address*/
+	OLED_WR_Byte(0x00, OLED_CMD); /*set display start line*/
+	OLED_WR_Byte(0xB0, OLED_CMD); /*set page address*/
+	OLED_WR_Byte(0x81, OLED_CMD); /*contract control*/
+	OLED_WR_Byte(0x8F, OLED_CMD); /*128*/
 	OLED_WR_Byte(0xA1, OLED_CMD); /*set segment remap*/
 	OLED_WR_Byte(0xA6, OLED_CMD); /*normal / reverse*/
 	OLED_WR_Byte(0xA8, OLED_CMD); /*multiplex ratio*/
@@ -546,21 +573,23 @@ void OLED_Init(void)
 	OLED_WR_Byte(0xAF, OLED_CMD); /*display ON*/
 }
 
-
 void keyboard_pre_init_user(void)
 {
-    OLED_Init();
-    		OLED_Clear();
-		OLED_ShowChinese(0,0,0,16,1);//中
-		OLED_ShowChinese(18,0,1,16,1);//景
-		OLED_ShowChinese(36,0,2,16,1);//园
-		OLED_ShowChinese(54,0,3,16,1);//电
-		OLED_ShowChinese(72,0,4,16,1);//子
-		OLED_ShowChinese(90,0,5,16,1);//技
-		OLED_ShowChinese(108,0,6,16,1);//术
-		OLED_ShowString(8,16,(unsigned char*)"ZHONGJINGYUAN",16,1);
-		OLED_ShowString(20,32,(unsigned char*)"2014/05/01",16,1);
-		OLED_ShowString(0,48,(unsigned char*)"ASCII:",16,1);  
-		OLED_ShowString(63,48,(unsigned char*)"CODE:",16,1);
-		OLED_ShowChar(48,48,15,16,1);//显示ASCII字符	 
+	OLED_Init();
+	OLED_Clear();
+}
+
+uint16_t anim_timer = 0;
+uint8_t current_anim_frame = 0;
+
+void housekeeping_task_user(void)
+{
+	if (timer_elapsed(anim_timer) > ANIM_FRAME_DURATION)
+	{
+		anim_timer = timer_read();
+		current_anim_frame = (current_anim_frame + 1) % ANIM_TOTAL_FRAMES;
+		OLED_ShowPicture(0, 0, 128, 32, frame[abs((ANIM_NUM_FRAMES - 1) - current_anim_frame)], 1);
+		OLED_Refresh();
+	}
+	wait_ms(1);
 }
